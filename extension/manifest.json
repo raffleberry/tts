@@ -1,0 +1,39 @@
+{
+    "manifest_version": 2,
+    "name": "TTS Sender",
+    "version": "1.1",
+    "permissions": [
+        "contextMenus",
+        "activeTab"
+    ],
+    "background": {
+        "scripts": [
+            "background.js"
+        ],
+        "persistent": false
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content.js"
+            ]
+        }
+    ],
+    "browser_action": {
+        "default_popup": "popup/popup.html",
+        "default_icon": {
+            "48": "icons/icon-red.svg"
+        }
+    },
+    "icons": {
+        "48": "icons/icon-green.svg"
+    },
+    "applications": {
+        "gecko": {
+            "id": "text-sender@localhost"
+        }
+    }
+}
