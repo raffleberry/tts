@@ -1,37 +1,77 @@
 const GO_APP_URL = "http://localhost:42042";
 
-let isGoAppOnline = false;
+let isAppOnline = false;
 
-async function checkGoAppStatus() {
+async function checkAppStatus() {
     try {
         const response = await fetch(GO_APP_URL + "/health", { method: "GET" });
-        isGoAppOnline = response.ok;
-        const iconPath = isGoAppOnline ? "icons/icon-green.svg" : "icons/icon-red.svg";
+        isAppOnline = response.ok;
+        const iconPath = isAppOnline ? "icons/icon-green.svg" : "icons/icon-red.svg";
         browser.browserAction.setIcon({ path: iconPath });
-        return isGoAppOnline;
+        return isAppOnline;
     } catch {
-        isGoAppOnline = false;
+        isAppOnline = false;
         browser.browserAction.setIcon({ path: "icons/icon-red.svg" });
         return false;
     }
 }
 
 browser.contextMenus.create({
-    id: "send-text-to-go",
+    id: "read-from-here",
     title: "Read from here",
     contexts: ["selection"]
 });
 
-browser.contextMenus.onClicked.addListener(async (info, tab) => {
-    if (info.menuItemId === "send-text-to-go") {
-        await checkGoAppStatus();
+browser.contextMenus.create({
+    id: "continue-reading",
+    title: "Continue-reading",
+    contexts: ["selection"]
+});
 
-        if (isGoAppOnline) {
+browser.contextMenus.create({
+    id: "stop-reading",
+    title: "Stop-reading",
+    contexts: ["selection"]
+});
+
+var stopReading = false;
+
+browser.contextMenus.onClicked.addListener(async (info, tab) => {
+    if (info.menuItemId === "read-from-here") {
+        await checkAppStatus();
+
+        if (isAppOnline) {
             try {
-                const response = await browser.tabs.sendMessage(tab.id, { action: "getParentText" });
+                let i = 0;
+                while (!stopReading) {
+                    let action = "continueFromCursor";
+                    if (i == 0) {
+                        action = "getText";
+                    }
+                    const response = browser.tabs.sendMessage(tab.id, { action: action });
+                    console.log(response.text);
+                    if (response && response.text) {
+                        await sendToApp(JSON.stringify(response));
+                    }
+                    await new Promise(r => setTimeout(r, 2000));
+                    i += 1
+                }
+                stopReading = false;
+            } catch (error) {
+                console.error("Error getting parent text:", error);
+            }
+        } else {
+            console.error("Go app is offline. Cannot send text.");
+        }
+    } else if (info.menuItemId === "continue-reading") {
+        await checkAppStatus();
+
+        if (isAppOnline) {
+            try {
+                const response = await browser.tabs.sendMessage(tab.id, { action: "continueFromCursor" });
                 console.log(response);
                 if (response && response.text) {
-                    await sendToGoApp(JSON.stringify(response));
+                    await sendToApp(JSON.stringify(response));
                 }
             } catch (error) {
                 console.error("Error getting parent text:", error);
@@ -39,10 +79,12 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
         } else {
             console.error("Go app is offline. Cannot send text.");
         }
+    } else if (info.menuItemId === "stop-reading") {
+        stopReading = true;
     }
 });
 
-async function sendToGoApp(payload) {
+async function sendToApp(payload) {
     try {
         const response = await fetch(GO_APP_URL, {
             method: "POST",
@@ -60,8 +102,8 @@ async function sendToGoApp(payload) {
 }
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === "checkGoAppStatus") {
-        checkGoAppStatus().then((status) => sendResponse({ online: status }));
+    if (message.action === "checkAppStatus") {
+        checkAppStatus().then((status) => sendResponse({ online: status }));
         return true;
     }
 });

@@ -1,59 +1,95 @@
-const averageWordsPerSentence = 50;
+const minTextLength = 50;
+const maxTextLength = 100;
 
-/** @type {Node} */
+/**
+ * @type {Node}
+ */
 var cursor = null;
 
-async function getParentText() {
-    try {
-        const selection = window.getSelection();
-        let res = "";
-        let extraPrefix = "";
-        if (selection.rangeCount > 0) {
-            let el = selection.getRangeAt(0).commonAncestorContainer;
-            let selectedText = selection.getRangeAt(0).toString();
-            extraPrefix = selectedText;
-            while (el.parentElement != null && el.textContent.length < averageWordsPerSentence) {
-                let curText = el.textContent;
-                extraPrefix = curText.slice(0, curText.search(extraPrefix)) + extraPrefix;
+/**
+ * Traverses the DOM tree to find the first parent node with a text content of at least minTextLength
+ * @param {Node} el
+ * 
+ * @typedef {Object} TraverseResult
+ * @property {Array<Node>} nodes
+ * @property {string} text
+ * @property {Node} continueCursor
+ * 
+ * @returns {TraverseResult} 
+ */
+function traverse(el) {
+    let resNodes = [];
+    let resText = "";
+    while (el.parentElement != null && resText < minTextLength) {
+
+        // weird, sometimes this is undefined(need to traverse into the tree)
+        if (el.innerText) {
+            if (el.innerText.trim() !== "") {
+                resText += el.innerText + " ";
+            }
+        } else {
+            if (el.textContent.trim() !== "") {
+                resText += el.textContent + " ";
+            }
+        }
+        resNodes.push(el);
+
+        if (el.nextSibling == null) {
+            while (el != null && el.nextSibling == null) {
                 el = el.parentElement;
             }
-            let curText = el.textContent;
-            extraPrefix = curText.slice(0, curText.search(extraPrefix)) + extraPrefix;
-
-            extraPrefix = extraPrefix.slice(0, extraPrefix.length - selectedText.length);
-
-            cursor = el;
-            res = el.textContent;
+            if (el == null) break;
+            el.nextSibling;
+            el.firstChild;
+        } else if (el.nextSibling != null) {
+            el = el.nextSibling;
         }
-        return { extraPrefix: extraPrefix, text: res };
+    }
+    console.log(resText, resNodes, el);
+    return { nodes: resNodes, text: resText, continueCursor: el };
+}
+
+/**
+ * 
+ * @param {Node} continueCursor 
+ * @returns 
+ */
+function getText(continueCursor = null) {
+    try {
+        const selection = window.getSelection();
+        console.log(continueCursor);
+        /**
+         * @type {Node}
+         */
+        let el = null;
+        if (continueCursor) {
+            el = continueCursor
+        } else {
+            el = selection.getRangeAt(0).commonAncestorContainer;
+        }
+        const res = traverse(el, minTextLength);
+        cursor = res.continueCursor;
+        console.log(res)
+        return { text: res.text, nodes: res.nodes };
     } catch (error) {
         console.error("Error getting parent text:", error);
         throw error;
     }
 }
 
-async function continueFromCursor() {
-    if (cursor) {
-        const text = cursor.textContent;
-        const range = document.createRange();
-        range.setStart(cursor, text.length);
-        range.setEnd(cursor, text.length);
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-    }
-    return "";
-}
-
-browser.runtime.onMessage.addListener(async (message) => {
-    if (message.action === "getParentText") {
-        return getParentText();
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log(message)
+    if (message.action === "getText") {
+        let res = getText();
+        return sendResponse(res);
     } else if (message.action === "continueFromCursor") {
-        return continueFromCursor();
+        let res = getText(cursor);
+        return sendResponse(res);
     } else if (message.action === "eraseCursor") {
         cursor = null;
-        return "";
+        return sendResponse("OK")
     }
+    sendResponse("BAD REQUEST")
 });
 
 
