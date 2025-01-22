@@ -6,6 +6,41 @@ const maxTextLength = 100;
  */
 var cursor = null;
 var textQueue = [];
+var currentHighlight = {
+    highlight: {
+        'background-color': 'black',
+        'color': 'white',
+    },
+    original: [],
+    textId: null
+}
+
+/**
+ * @param {Node} els
+ * @returns {Object} styles of `els`
+ */
+function getStyle(els) {
+    let r = {}
+    for (let i = 0; i < els.length; i++) {
+        for (const prop of Object.keys(currentHighlight.highlight)) {
+            r[prop] = els[i].style[prop];
+        }
+    }
+    return r;
+}
+
+
+/**
+ * @param {Node} els
+ * @param {Object} style
+ */
+function applyStyle(els, style) {
+    for (let i = 0; i < els.length; i++) {
+        for (const [prop, val] of Object.entries(style)) {
+            els[i].style[prop] = val;
+        }
+    }
+}
 
 /**
  * Traverses the DOM tree to find the first parent node with a text content of at least minTextLength
@@ -40,7 +75,7 @@ function traverse(el) {
                 el = el.parentElement;
             }
             if (el == null) break;
-            el.nextSibling;
+            el = el.nextSibling;
             el.firstChild;
         } else if (el.nextSibling != null) {
             el = el.nextSibling;
@@ -69,11 +104,20 @@ function getText(continueCursor = null) {
         const res = traverse(el, minTextLength);
         cursor = res.continueCursor;
         textQueue.push(res.nodes);
-        return { text: res.text, textQueueId: textQueue.length - 1 };
+        return { text: res.text, textId: textQueue.length - 1 };
     } catch (error) {
         console.error("Error getting parent text:", error);
-        return { error: error };
+        return { err: error };
     }
+}
+
+function highlight(textId) {
+    if (currentHighlight.textId != null) {
+        applyStyle(textQueue[currentHighlight.textId], currentHighlight.original);
+    }
+    currentHighlight.textId = textId;
+    currentHighlight.original = getStyle(textQueue[textId])
+    applyStyle(textQueue[textId], currentHighlight.highlight)
 }
 
 browser.runtime.onMessage.addListener(async (message) => {
@@ -83,9 +127,16 @@ browser.runtime.onMessage.addListener(async (message) => {
         return getText(cursor);
     } else if (message.action === "eraseCursor") {
         cursor = null;
-        return "OK";
+        return { "ok": "" };
+    } else if (message.action === "highlight") {
+        const { textId } = message;
+        if (textId) {
+            highlight(textId)
+        } else {
+            return { err: "textId required" }
+        }
     }
-    return "BAD REQUEST"
+    return { err: "BAD REQUEST" }
 });
 
 

@@ -51,8 +51,9 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
                     console.log(response)
                     if (response && response.text) {
                         await sendToApp(JSON.stringify(response));
+                        await browser.tabs.sendMessage(tab.id, { action: "highlight", textId: response.textId })
                     }
-                    await new Promise(r => setTimeout(r, 2000));
+                    await new Promise(r => setTimeout(r, 5000));
                     i += 1
                 }
                 stopReading = false;
