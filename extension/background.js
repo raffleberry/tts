@@ -39,7 +39,6 @@ var stopReading = false;
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
     if (info.menuItemId === "read-from-here") {
         await checkAppStatus();
-
         if (isAppOnline) {
             try {
                 let i = 0;
@@ -48,8 +47,8 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
                     if (i == 0) {
                         action = "getText";
                     }
-                    const response = browser.tabs.sendMessage(tab.id, { action: action });
-                    console.log(response.text);
+                    const response = await browser.tabs.sendMessage(tab.id, { action: action });
+                    console.log(response)
                     if (response && response.text) {
                         await sendToApp(JSON.stringify(response));
                     }

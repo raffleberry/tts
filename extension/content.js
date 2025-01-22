@@ -5,6 +5,7 @@ const maxTextLength = 100;
  * @type {Node}
  */
 var cursor = null;
+var textQueue = [];
 
 /**
  * Traverses the DOM tree to find the first parent node with a text content of at least minTextLength
@@ -45,7 +46,6 @@ function traverse(el) {
             el = el.nextSibling;
         }
     }
-    console.log(resText, resNodes, el);
     return { nodes: resNodes, text: resText, continueCursor: el };
 }
 
@@ -57,7 +57,6 @@ function traverse(el) {
 function getText(continueCursor = null) {
     try {
         const selection = window.getSelection();
-        console.log(continueCursor);
         /**
          * @type {Node}
          */
@@ -69,27 +68,24 @@ function getText(continueCursor = null) {
         }
         const res = traverse(el, minTextLength);
         cursor = res.continueCursor;
-        console.log(res)
-        return { text: res.text, nodes: res.nodes };
+        textQueue.push(res.nodes);
+        return { text: res.text, textQueueId: textQueue.length - 1 };
     } catch (error) {
         console.error("Error getting parent text:", error);
-        throw error;
+        return { error: error };
     }
 }
 
-browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log(message)
+browser.runtime.onMessage.addListener(async (message) => {
     if (message.action === "getText") {
-        let res = getText();
-        return sendResponse(res);
+        return getText();
     } else if (message.action === "continueFromCursor") {
-        let res = getText(cursor);
-        return sendResponse(res);
+        return getText(cursor);
     } else if (message.action === "eraseCursor") {
         cursor = null;
-        return sendResponse("OK")
+        return "OK";
     }
-    sendResponse("BAD REQUEST")
+    return "BAD REQUEST"
 });
 
 
